@@ -1,13 +1,20 @@
 import { Api } from "node-telegram-bot-api";
 
-const token = process.env.TELEGRAM_BOT_TOKEN;
 const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
 
-if (!token) {
-  throw new Error("TELEGRAM_BOT_TOKEN is not set in environment variables");
+// Lazily instantiated so the module can be imported without crashing
+// at build/static-generation time when env vars may not be present.
+let _api: Api | null = null;
+function getApi(): Api {
+  if (!_api) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) {
+      throw new Error("TELEGRAM_BOT_TOKEN is not set in environment variables");
+    }
+    _api = new Api(token);
+  }
+  return _api;
 }
-
-const telegramApi = new Api(token);
 
 /**
  * Set up the Telegram webhook
@@ -21,11 +28,11 @@ export async function setupTelegramWebhook() {
 
   try {
     // Remove any existing webhook first
-    await telegramApi.deleteWebhook({ drop_pending_updates: true });
+    await getApi().deleteWebhook({ drop_pending_updates: true });
     console.log("Previous webhook deleted");
 
     // Set the new webhook
-    await telegramApi.setWebhook({
+    await getApi().setWebhook({
       url: webhookUrl,
       allowed_updates: ["message", "edited_message", "callback_query"],
     });
@@ -42,7 +49,7 @@ export async function setupTelegramWebhook() {
  */
 export async function getTelegramWebhookInfo() {
   try {
-    const info = await telegramApi.getWebhookInfo();
+    const info = await getApi().getWebhookInfo();
     return info;
   } catch (error) {
     console.error("Error getting webhook info:", error);
@@ -59,7 +66,7 @@ export async function sendTelegramMessage(
   options?: any
 ) {
   try {
-    await telegramApi.sendMessage(
+    await getApi().sendMessage(
       {
         chat_id: chatId,
         text,
@@ -84,7 +91,7 @@ export async function sendTelegramKeyboard(
 ) {
   try {
     const keyboard = buttons.map((row) => row.map((label) => ({ text: label })));
-    await telegramApi.sendMessage(
+    await getApi().sendMessage(
       {
         chat_id: chatId,
         text,
@@ -111,7 +118,7 @@ export async function forwardToAdmin(
   toChatId: string | number
 ) {
   try {
-    await telegramApi.forwardMessage({
+    await getApi().forwardMessage({
       chat_id: toChatId,
       from_chat_id: fromChatId,
       message_id: messageId,
@@ -128,7 +135,7 @@ export async function forwardToAdmin(
  */
 export async function deleteTelegramWebhook() {
   try {
-    await telegramApi.deleteWebhook({ drop_pending_updates: false });
+    await getApi().deleteWebhook({ drop_pending_updates: false });
     console.log("Telegram webhook deleted");
   } catch (error) {
     console.error("Error deleting webhook:", error);
@@ -136,4 +143,4 @@ export async function deleteTelegramWebhook() {
   }
 }
 
-export default telegramApi;
+export default getApi;

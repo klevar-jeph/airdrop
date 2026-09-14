@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { setupTelegramWebhook, getTelegramWebhookInfo } from "@/utils/telegram";
 
+// Prevent this route from running at build/static-generation time.
+// It must only execute on explicit GET requests.
+export const dynamic = "force-dynamic";
+
 /**
  * Initialize Telegram webhook
  * GET /api/telegram/init

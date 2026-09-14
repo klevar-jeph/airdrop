@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { messageStore, type TelegramMessage } from "@/lib/telegramStore";
 
+export const dynamic = "force-dynamic";
+
 interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
