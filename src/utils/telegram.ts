@@ -83,12 +83,13 @@ export async function sendTelegramKeyboard(
   buttons: string[][]
 ) {
   try {
+    const keyboard = buttons.map((row) => row.map((label) => ({ text: label })));
     await telegramApi.sendMessage(
       {
         chat_id: chatId,
         text,
         reply_markup: {
-          keyboard: buttons,
+          keyboard,
           resize_keyboard: true,
         },
       },

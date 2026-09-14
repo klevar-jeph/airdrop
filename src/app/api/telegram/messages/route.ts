@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { messageStore } from "../webhook/route";
+import { messageStore } from "@/lib/telegramStore";
 
 /**
  * Get all received messages (for testing/admin)
